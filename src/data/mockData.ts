@@ -18,10 +18,11 @@ export interface BehavioralData {
 }
 
 export interface LocationData {
+  locality: string;
   city: string;
   country: string;
   timezone: string;
-  coordinates: { lat: number; lng: number };
+  isp: string;
   geoPatterns: string[];
 }
 
