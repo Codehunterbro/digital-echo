@@ -12,8 +12,17 @@ export default {
         "2xl": "1400px",
       },
     },
+    fontFamily: {
+      sans: ['Inter', 'system-ui', 'sans-serif'],
+      mono: ['JetBrains Mono', 'monospace'],
+    },
     extend: {
       colors: {
+        "node-behavioral": "hsl(var(--node-behavioral))",
+        "node-location": "hsl(var(--node-location))",
+        "node-personal": "hsl(var(--node-personal))",
+        "node-social": "hsl(var(--node-social))",
+        "node-center": "hsl(var(--node-center))",
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
