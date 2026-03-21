@@ -10,6 +10,7 @@ import {
   ConnectionLineType,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+import { toast } from 'sonner';
 
 import { CenterNode } from '@/components/graph/CenterNode';
 import { BubbleNode } from '@/components/graph/BubbleNode';
@@ -18,7 +19,8 @@ import { SocialHubNode } from '@/components/graph/SocialHubNode';
 import { DetailPanel } from '@/components/panels/DetailPanel';
 import { SearchBar } from '@/components/SearchBar';
 import { StatusBar } from '@/components/StatusBar';
-import { mockPerson } from '@/data/mockData';
+import { supabase } from '@/integrations/supabase/client';
+import type { PersonData } from '@/data/mockData';
 
 const nodeTypes = {
   center: CenterNode,
@@ -27,7 +29,7 @@ const nodeTypes = {
   socialHub: SocialHubNode,
 };
 
-function buildGraph(person: typeof mockPerson, onSelect: (id: string) => void) {
+function buildGraph(person: PersonData, onSelect: (id: string) => void) {
   const nodes: Node[] = [];
   const edges: Edge[] = [];
 
@@ -81,7 +83,7 @@ function buildGraph(person: typeof mockPerson, onSelect: (id: string) => void) {
   });
   edges.push({ id: 'e-center-social', source: 'center', target: 'social-hub', sourceHandle: 'right', type: 'smoothstep', animated: true, style: { stroke: 'hsl(0, 70%, 55%)', strokeWidth: 1.5 } });
 
-  // Social platform nodes — evenly spaced
+  // Social platform nodes
   const totalSocial = person.social.length;
   const socialSpacing = 95;
   const socialBlockHeight = (totalSocial - 1) * socialSpacing;
@@ -113,53 +115,83 @@ function buildGraph(person: typeof mockPerson, onSelect: (id: string) => void) {
 export default function IdentityMapper() {
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
-  const [person] = useState(mockPerson);
+  const [person, setPerson] = useState<PersonData | null>(null);
 
-  const { nodes: initNodes, edges: initEdges } = useMemo(
-    () => buildGraph(person, setSelectedNode),
+  const { nodes: graphNodes, edges: graphEdges } = useMemo(
+    () => person ? buildGraph(person, setSelectedNode) : { nodes: [], edges: [] },
     [person]
   );
 
-  const [nodes, , onNodesChange] = useNodesState(initNodes);
-  const [edges, , onEdgesChange] = useEdgesState(initEdges);
+  const [nodes, setNodes, onNodesChange] = useNodesState(graphNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(graphEdges);
 
-  const handleSearch = useCallback((query: string) => {
+  // Sync when person changes
+  useMemo(() => {
+    setNodes(graphNodes);
+    setEdges(graphEdges);
+  }, [graphNodes, graphEdges, setNodes, setEdges]);
+
+  const handleSearch = useCallback(async (query: string) => {
     setIsScanning(true);
-    setTimeout(() => {
+    setSelectedNode(null);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('investigate', {
+        body: { query },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      setPerson(data as PersonData);
+      setTimeout(() => setSelectedNode('center'), 300);
+    } catch (err: any) {
+      console.error('Investigation failed:', err);
+      toast.error(err.message || 'Failed to investigate. Please try again.');
+    } finally {
       setIsScanning(false);
-      setSelectedNode('center');
-    }, 2000);
+    }
   }, []);
 
   return (
     <div className="w-full h-screen bg-background relative overflow-hidden">
-      {/* Background grid effect */}
       <div className="absolute inset-0 cyber-grid opacity-40" />
       <div className="absolute inset-0 scan-line pointer-events-none" />
 
       <SearchBar onSearch={handleSearch} isScanning={isScanning} />
 
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        nodeTypes={nodeTypes}
-        connectionLineType={ConnectionLineType.SmoothStep}
-        fitView
-        fitViewOptions={{ padding: 0.3 }}
-        minZoom={0.3}
-        maxZoom={2}
-        proOptions={{ hideAttribution: true }}
-      >
-        <Background color="hsl(220, 15%, 12%)" gap={40} size={1} />
-        <Controls
-          className="!bg-card !border-border !rounded-xl !shadow-2xl [&>button]:!bg-secondary [&>button]:!border-border [&>button]:!text-muted-foreground [&>button:hover]:!bg-secondary/80"
-          showInteractive={false}
-        />
-      </ReactFlow>
+      {person ? (
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          nodeTypes={nodeTypes}
+          connectionLineType={ConnectionLineType.SmoothStep}
+          fitView
+          fitViewOptions={{ padding: 0.3 }}
+          minZoom={0.3}
+          maxZoom={2}
+          proOptions={{ hideAttribution: true }}
+        >
+          <Background color="hsl(220, 15%, 12%)" gap={40} size={1} />
+          <Controls
+            className="!bg-card !border-border !rounded-xl !shadow-2xl [&>button]:!bg-secondary [&>button]:!border-border [&>button]:!text-muted-foreground [&>button:hover]:!bg-secondary/80"
+            showInteractive={false}
+          />
+        </ReactFlow>
+      ) : (
+        <div className="flex items-center justify-center h-full">
+          <div className="text-center space-y-3">
+            <p className="text-muted-foreground text-sm font-mono">Enter a username above to begin investigation</p>
+            <p className="text-muted-foreground/50 text-xs">Powered by AI · Uses only public data patterns</p>
+          </div>
+        </div>
+      )}
 
-      <DetailPanel selectedNode={selectedNode} person={person} onClose={() => setSelectedNode(null)} />
+      {person && (
+        <DetailPanel selectedNode={selectedNode} person={person} onClose={() => setSelectedNode(null)} />
+      )}
       <StatusBar />
     </div>
   );
