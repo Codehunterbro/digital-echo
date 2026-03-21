@@ -154,12 +154,18 @@ function LocationPanel({ person }: { person: PersonData }) {
     <div className="space-y-3">
       <SectionCard>
         <h4 className="text-xs font-semibold text-foreground mb-2 flex items-center gap-1.5">
-          <MapPin className="w-3.5 h-3.5 text-node-location" /> Primary Location
+          <MapPin className="w-3.5 h-3.5 text-node-location" /> Estimated Location
         </h4>
-        <StatRow label="City" value={l.city} color="hsl(140, 70%, 45%)" />
+        <StatRow label="Locality" value={l.locality} color="hsl(140, 70%, 45%)" />
+        <StatRow label="City" value={l.city} />
         <StatRow label="Country" value={l.country} />
+      </SectionCard>
+      <SectionCard>
+        <h4 className="text-xs font-semibold text-foreground mb-2 flex items-center gap-1.5">
+          <Globe className="w-3.5 h-3.5 text-node-location" /> Network & Timezone
+        </h4>
+        <StatRow label="ISP" value={l.isp} color="hsl(140, 70%, 45%)" />
         <StatRow label="Timezone" value={l.timezone} />
-        <StatRow label="Coordinates" value={`${l.coordinates.lat}°N, ${l.coordinates.lng}°E`} />
       </SectionCard>
       <SectionCard>
         <h4 className="text-xs font-semibold text-foreground mb-2">Geo Patterns</h4>

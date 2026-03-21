@@ -18,10 +18,11 @@ export interface BehavioralData {
 }
 
 export interface LocationData {
+  locality: string;
   city: string;
   country: string;
   timezone: string;
-  coordinates: { lat: number; lng: number };
+  isp: string;
   geoPatterns: string[];
 }
 
@@ -69,10 +70,11 @@ export const mockPerson: PersonData = {
     ],
   },
   location: {
+    locality: "Mitte District",
     city: "Berlin",
     country: "Germany",
     timezone: "CET (UTC+1)",
-    coordinates: { lat: 52.52, lng: 13.405 },
+    isp: "Deutsche Telekom",
     geoPatterns: [
       "Primarily active from European timezone",
       "Occasional late-night posts suggest travel to US West Coast",
