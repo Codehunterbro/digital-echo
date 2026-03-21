@@ -31,11 +31,15 @@ function buildGraph(person: typeof mockPerson, onSelect: (id: string) => void) {
   const nodes: Node[] = [];
   const edges: Edge[] = [];
 
+  const cx = 450;
+  const cy = 350;
+  const radius = 220;
+
   // Center
   nodes.push({
     id: 'center',
     type: 'center',
-    position: { x: 400, y: 350 },
+    position: { x: cx - 64, y: cy - 64 },
     data: { label: person.name, subtitle: person.username, avatar: person.avatar, riskScore: person.riskScore, onSelect: () => onSelect('center') },
   });
 
@@ -43,47 +47,53 @@ function buildGraph(person: typeof mockPerson, onSelect: (id: string) => void) {
   nodes.push({
     id: 'behavioral',
     type: 'bubble',
-    position: { x: 364, y: 120 },
+    position: { x: cx - 56, y: cy - radius - 56 },
     data: { label: 'Behavioral', type: 'behavioral', summary: 'Patterns & Tone', onSelect: () => onSelect('behavioral') },
   });
-  edges.push({ id: 'e-center-behavioral', source: 'center', target: 'behavioral', sourceHandle: 'top', animated: true, style: { stroke: 'hsl(280, 70%, 55%)', strokeWidth: 1.5 } });
+  edges.push({ id: 'e-center-behavioral', source: 'center', target: 'behavioral', sourceHandle: 'top', type: 'smoothstep', animated: true, style: { stroke: 'hsl(280, 70%, 55%)', strokeWidth: 1.5 } });
 
   // Location (left)
   nodes.push({
     id: 'location',
     type: 'bubble',
-    position: { x: 140, y: 310 },
+    position: { x: cx - radius - 56, y: cy - 56 },
     data: { label: 'Location', type: 'location', summary: `${person.location.city}, ${person.location.country}`, onSelect: () => onSelect('location') },
   });
-  edges.push({ id: 'e-center-location', source: 'center', target: 'location', sourceHandle: 'left', animated: true, style: { stroke: 'hsl(140, 70%, 45%)', strokeWidth: 1.5 } });
+  edges.push({ id: 'e-center-location', source: 'center', target: 'location', sourceHandle: 'left', type: 'smoothstep', animated: true, style: { stroke: 'hsl(140, 70%, 45%)', strokeWidth: 1.5 } });
 
   // Personal (bottom)
   nodes.push({
     id: 'personal',
     type: 'bubble',
-    position: { x: 364, y: 570 },
+    position: { x: cx - 56, y: cy + radius - 56 },
     data: { label: 'Personal', type: 'personal', summary: 'Identity & Aliases', onSelect: () => onSelect('personal') },
   });
-  edges.push({ id: 'e-center-personal', source: 'center', target: 'personal', sourceHandle: 'bottom', animated: true, style: { stroke: 'hsl(40, 90%, 55%)', strokeWidth: 1.5 } });
+  edges.push({ id: 'e-center-personal', source: 'center', target: 'personal', sourceHandle: 'bottom', type: 'smoothstep', animated: true, style: { stroke: 'hsl(40, 90%, 55%)', strokeWidth: 1.5 } });
 
   // Social hub (right)
+  const hubX = cx + radius + 20;
+  const hubY = cy - 20;
   nodes.push({
     id: 'social-hub',
     type: 'socialHub',
-    position: { x: 650, y: 330 },
+    position: { x: hubX, y: hubY },
     data: { label: 'Social', count: person.social.length },
   });
-  edges.push({ id: 'e-center-social', source: 'center', target: 'social-hub', sourceHandle: 'right', animated: true, style: { stroke: 'hsl(0, 70%, 55%)', strokeWidth: 1.5 } });
+  edges.push({ id: 'e-center-social', source: 'center', target: 'social-hub', sourceHandle: 'right', type: 'smoothstep', animated: true, style: { stroke: 'hsl(0, 70%, 55%)', strokeWidth: 1.5 } });
 
-  // Social platform nodes
-  const socialStartY = 120;
-  const socialSpacing = 110;
+  // Social platform nodes — evenly spaced
+  const totalSocial = person.social.length;
+  const socialSpacing = 95;
+  const socialBlockHeight = (totalSocial - 1) * socialSpacing;
+  const socialStartY = hubY + 20 - socialBlockHeight / 2;
+  const socialX = hubX + 170;
+
   person.social.forEach((s, i) => {
     const id = `social-${s.platform}`;
     nodes.push({
       id,
       type: 'social',
-      position: { x: 820, y: socialStartY + i * socialSpacing },
+      position: { x: socialX, y: socialStartY + i * socialSpacing },
       data: { platform: s.platform, username: s.username, confidence: s.confidence, color: s.color, onSelect: () => onSelect(s.platform) },
     });
     edges.push({
@@ -91,6 +101,7 @@ function buildGraph(person: typeof mockPerson, onSelect: (id: string) => void) {
       source: 'social-hub',
       target: id,
       sourceHandle: 'out',
+      type: 'smoothstep',
       animated: false,
       style: { stroke: `${s.color}88`, strokeWidth: 1 },
     });
