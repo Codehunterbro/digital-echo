@@ -60,7 +60,7 @@ export function FinderForm({ onSearch, isScanning }: Props) {
               type="text"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
-              placeholder="e.g. Jane Doe"
+              placeholder="e.g. Aarav Sharma"
               required
               className="w-full bg-secondary/60 border border-border rounded-xl px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-primary/60 transition-colors"
             />
@@ -95,7 +95,7 @@ export function FinderForm({ onSearch, isScanning }: Props) {
             label="Known usernames / handles (optional)"
             value={knownUsernames}
             onChange={setKnownUsernames}
-            placeholder="@janedoe, jdoe92"
+            placeholder="@aaravsharma, asharma_07"
           />
 
           <button
