@@ -139,6 +139,56 @@ Prioritize working public profiles, cross-link accounts via bio/external links, 
     const jsonStr = content.replace(/```json?\s*/g, "").replace(/```\s*/g, "").trim();
     const report = JSON.parse(jsonStr);
 
+    // Normalize URLs so every link is clickable and opens the actual platform
+    const buildUrl = (platform: string, username: string): string => {
+      const u = (username || "").replace(/^@+/, "").trim();
+      if (!u) return "";
+      const p = (platform || "").toLowerCase();
+      if (p.includes("linkedin")) return `https://www.linkedin.com/in/${u}`;
+      if (p.includes("instagram")) return `https://www.instagram.com/${u}`;
+      if (p.includes("twitter") || p === "x") return `https://x.com/${u}`;
+      if (p.includes("facebook")) return `https://www.facebook.com/${u}`;
+      if (p.includes("youtube")) return `https://www.youtube.com/@${u}`;
+      if (p.includes("tiktok")) return `https://www.tiktok.com/@${u}`;
+      if (p.includes("github")) return `https://github.com/${u}`;
+      if (p.includes("reddit")) return `https://www.reddit.com/user/${u}`;
+      if (p.includes("snapchat")) return `https://www.snapchat.com/add/${u}`;
+      return "";
+    };
+
+    const normalizeUrl = (url: string, platform: string, username = ""): string => {
+      let raw = (url || "").trim();
+      if (!raw) return buildUrl(platform, username);
+      // strip markdown / brackets / trailing punctuation
+      raw = raw.replace(/[<>()\[\]"']/g, "").replace(/[.,;]+$/, "");
+      if (raw.startsWith("//")) raw = "https:" + raw;
+      if (!/^https?:\/\//i.test(raw)) {
+        if (/^[\w.-]+\.[a-z]{2,}/i.test(raw)) raw = "https://" + raw;
+        else return buildUrl(platform, username || raw);
+      }
+      try {
+        const parsed = new URL(raw);
+        return parsed.toString();
+      } catch {
+        return buildUrl(platform, username);
+      }
+    };
+
+    if (Array.isArray(report.groups)) {
+      for (const g of report.groups) {
+        if (Array.isArray(g.verifiedProfiles)) {
+          g.verifiedProfiles = g.verifiedProfiles
+            .map((p: any) => ({ ...p, url: normalizeUrl(p.url, p.platform, p.username) }))
+            .filter((p: any) => !!p.url);
+        }
+        if (Array.isArray(g.crossLinkedAccounts)) {
+          g.crossLinkedAccounts = g.crossLinkedAccounts
+            .map((c: any) => ({ ...c, url: normalizeUrl(c.url, c.platform) }))
+            .filter((c: any) => !!c.url);
+        }
+      }
+    }
+
     return new Response(JSON.stringify(report), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
