@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { fullName, location, interests, profession } = await req.json();
+    const { fullName, location, interests, profession, knownUsernames } = await req.json();
     if (!fullName || typeof fullName !== "string") {
       return new Response(JSON.stringify({ error: "Missing fullName" }), {
         status: 400,
@@ -23,7 +23,18 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const systemPrompt = `You are an OSINT (Open Source Intelligence) researcher specializing in social media reconnaissance. Given a person's full name and optional filters (location, interests, profession), generate a realistic plausible (fictional but believable) shortlist of social media profiles that could belong to that person.
+    const systemPrompt = `You are an expert OSINT researcher. Given a person's full name and optional details, identify possible WORKING and PUBLIC social media profiles that align with the description, and CROSS-LINK accounts via bio/about-section links between platforms.
+
+CRITICAL RULES:
+- Only include profiles that would realistically be public and working (no broken / private / suspended links).
+- URLs must follow real platform URL conventions (linkedin.com/in/<slug>, instagram.com/<user>, x.com/<user>, youtube.com/@<user>, facebook.com/<user>, github.com/<user>, etc.).
+- If multiple distinct people share the name, SEPARATE them into distinct groups (Person A, Person B, ...). Never merge different people.
+- Only include groups that match at least some of the provided details (location, profession, interests, known usernames).
+- Each group MUST have at least 3 verified data points (e.g. profile photo match, username similarity, location, job/education, bio keywords, follower overlap, posted content).
+- Each group's connectionExplanation MUST describe HOW the profiles cross-link (e.g. "LinkedIn 'Contact info' links Instagram handle, which links YouTube in bio").
+- crossLinkedAccounts are accounts discovered specifically via the bio/external link of another verifiedProfile in the same group — describe in discoveredVia.
+- If no group strongly matches the provided details, return groups: [] and noConfirmedMatch: true.
+- Confidence: "High" only when 4+ strong indicators align across 3+ platforms; "Medium" for 3 indicators / 2 platforms; "Low" otherwise.
 
 Respond ONLY with valid JSON (no markdown, no commentary) matching this exact structure:
 
@@ -32,55 +43,58 @@ Respond ONLY with valid JSON (no markdown, no commentary) matching this exact st
     "fullName": "string",
     "location": "string or null",
     "interests": "string or null",
-    "profession": "string or null"
+    "profession": "string or null",
+    "knownUsernames": "string or null"
   },
-  "summary": "2-3 sentence overview of the search and findings",
-  "overallConfidence": number 0-100,
-  "verdict": "Confirmed Match" | "Likely Match" | "Possible Match" | "No Confirmed Match",
-  "profiles": [
+  "summary": "2-3 sentence overview of the investigation and how many distinct individuals matched",
+  "noConfirmedMatch": boolean,
+  "groups": [
     {
-      "platform": "Instagram" | "Facebook" | "LinkedIn" | "Twitter (X)" | "Snapchat" | "TikTok" | "YouTube" | "Reddit" | "GitHub",
-      "username": "handle (no @)",
-      "displayName": "name shown on profile",
-      "url": "plausible profile URL",
-      "avatarHint": "short description of profile photo (e.g. 'professional headshot, brown hair')",
-      "bio": "short bio text from profile",
-      "location": "location shown on profile",
-      "followers": number or null,
-      "following": number or null,
-      "posts": number or null,
-      "lastActive": "e.g. '2 days ago'",
-      "verified": boolean,
-      "confidence": number 0-100,
-      "matchingIndicators": ["bullet point reasons it likely matches", ...] (2-5 items),
-      "inconsistencies": ["bullet point red flags / mismatches", ...] (0-3 items),
-      "status": "Shortlisted" | "Eliminated" | "Needs Review"
+      "groupName": "Person A",
+      "displayName": "name as it appears on the matched profiles",
+      "summary": "1-2 sentence description of who this person appears to be",
+      "matchedDetails": {
+        "location": "string or null",
+        "profession": "string or null",
+        "education": "string or null",
+        "interests": "string or null",
+        "company": "string or null"
+      },
+      "verifiedProfiles": [
+        {
+          "platform": "LinkedIn" | "Instagram" | "Twitter (X)" | "Facebook" | "YouTube" | "Snapchat" | "TikTok" | "GitHub" | "Reddit" | "Website",
+          "username": "handle without @",
+          "url": "full working profile URL",
+          "verified": boolean,
+          "bioExcerpt": "short snippet from bio (optional)"
+        }
+      ],
+      "crossLinkedAccounts": [
+        {
+          "platform": "string",
+          "url": "full URL",
+          "discoveredVia": "e.g. 'Linked from LinkedIn contact section', 'Listed in Instagram bio'"
+        }
+      ],
+      "verifiedDataPoints": ["at least 3 concrete matching signals"],
+      "connectionExplanation": "explain how these profiles are tied together via cross-platform links",
+      "confidence": "High" | "Medium" | "Low"
     }
-  ] (5-8 profiles across different platforms; mix shortlisted and eliminated),
-  "crossChecks": [
-    "string describing a cross-platform correlation finding"
-  ] (3-5 items),
-  "recommendations": [
-    "next step the researcher should take"
-  ] (2-4 items),
-  "disclaimer": "short ethical-use disclaimer"
+  ],
+  "disclaimer": "short ethical-use disclaimer (one sentence)"
 }
 
-Guidelines:
-- Be realistic. Common names should yield lower confidence and more eliminated profiles.
-- Use the location/profession/interests filters to bias the matching indicators.
-- Eliminated profiles should explain WHY (wrong location, wrong age, different profession, etc).
-- If the name is extremely common with no strong filters, set verdict to "No Confirmed Match" and overallConfidence below 40.
-- URLs should follow real platform URL conventions but the accounts are fictional.`;
+Return 1-3 groups when matches exist. Aim for 3-5 verifiedProfiles per group across different platforms.`;
 
-    const userPrompt = `Find social media profiles for:
+    const userPrompt = `Investigate possible social media profiles for:
 
 Full Name: ${fullName}
 Location: ${location || "(not specified)"}
-Interests: ${interests || "(not specified)"}
-Profession: ${profession || "(not specified)"}
+Profession / Education: ${profession || "(not specified)"}
+Interests / Company / Other identifiers: ${interests || "(not specified)"}
+Known usernames / handles: ${knownUsernames || "(not specified)"}
 
-Conduct the OSINT investigation and return the JSON report.`;
+Prioritize working public profiles, cross-link accounts via bio/external links, separate distinct individuals into groups, and only include groups matching at least some of the details above. Return the JSON report.`;
 
     const response = await fetch(
       "https://ai.gateway.lovable.dev/v1/chat/completions",
