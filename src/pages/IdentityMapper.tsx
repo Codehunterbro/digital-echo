@@ -1,197 +1,81 @@
-import { useCallback, useMemo, useState } from 'react';
-import {
-  ReactFlow,
-  Background,
-  Controls,
-  useNodesState,
-  useEdgesState,
-  type Node,
-  type Edge,
-  ConnectionLineType,
-} from '@xyflow/react';
-import '@xyflow/react/dist/style.css';
+import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
-
-import { CenterNode } from '@/components/graph/CenterNode';
-import { BubbleNode } from '@/components/graph/BubbleNode';
-import { SocialNode } from '@/components/graph/SocialNode';
-import { SocialHubNode } from '@/components/graph/SocialHubNode';
-import { DetailPanel } from '@/components/panels/DetailPanel';
-import { SearchBar } from '@/components/SearchBar';
-import { StatusBar } from '@/components/StatusBar';
+import { Search } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import type { PersonData } from '@/data/mockData';
-
-const nodeTypes = {
-  center: CenterNode,
-  bubble: BubbleNode,
-  social: SocialNode,
-  socialHub: SocialHubNode,
-};
-
-function buildGraph(person: PersonData, onSelect: (id: string) => void) {
-  const nodes: Node[] = [];
-  const edges: Edge[] = [];
-
-  const cx = 450;
-  const cy = 350;
-  const radius = 220;
-
-  // Center
-  nodes.push({
-    id: 'center',
-    type: 'center',
-    position: { x: cx - 64, y: cy - 64 },
-    data: { label: person.name, subtitle: person.username, avatar: person.avatar, riskScore: person.riskScore, onSelect: () => onSelect('center') },
-  });
-
-  // Behavioral (top)
-  nodes.push({
-    id: 'behavioral',
-    type: 'bubble',
-    position: { x: cx - 56, y: cy - radius - 56 },
-    data: { label: 'Behavioral', type: 'behavioral', summary: 'Patterns & Tone', onSelect: () => onSelect('behavioral') },
-  });
-  edges.push({ id: 'e-center-behavioral', source: 'center', target: 'behavioral', sourceHandle: 'top', type: 'smoothstep', animated: true, style: { stroke: 'hsl(280, 70%, 55%)', strokeWidth: 1.5 } });
-
-  // Location (left)
-  nodes.push({
-    id: 'location',
-    type: 'bubble',
-    position: { x: cx - radius - 56, y: cy - 56 },
-    data: { label: 'Location', type: 'location', summary: `${person.location.city}, ${person.location.country}`, onSelect: () => onSelect('location') },
-  });
-  edges.push({ id: 'e-center-location', source: 'center', target: 'location', sourceHandle: 'left', type: 'smoothstep', animated: true, style: { stroke: 'hsl(140, 70%, 45%)', strokeWidth: 1.5 } });
-
-  // Personal (bottom)
-  nodes.push({
-    id: 'personal',
-    type: 'bubble',
-    position: { x: cx - 56, y: cy + radius - 56 },
-    data: { label: 'Personal', type: 'personal', summary: 'Identity & Aliases', onSelect: () => onSelect('personal') },
-  });
-  edges.push({ id: 'e-center-personal', source: 'center', target: 'personal', sourceHandle: 'bottom', type: 'smoothstep', animated: true, style: { stroke: 'hsl(40, 90%, 55%)', strokeWidth: 1.5 } });
-
-  // Social hub (right)
-  const hubX = cx + radius + 20;
-  const hubY = cy - 20;
-  nodes.push({
-    id: 'social-hub',
-    type: 'socialHub',
-    position: { x: hubX, y: hubY },
-    data: { label: 'Social', count: person.social.length },
-  });
-  edges.push({ id: 'e-center-social', source: 'center', target: 'social-hub', sourceHandle: 'right', type: 'smoothstep', animated: true, style: { stroke: 'hsl(0, 70%, 55%)', strokeWidth: 1.5 } });
-
-  // Social platform nodes
-  const totalSocial = person.social.length;
-  const socialSpacing = 95;
-  const socialBlockHeight = (totalSocial - 1) * socialSpacing;
-  const socialStartY = hubY + 20 - socialBlockHeight / 2;
-  const socialX = hubX + 170;
-
-  person.social.forEach((s, i) => {
-    const id = `social-${s.platform}`;
-    nodes.push({
-      id,
-      type: 'social',
-      position: { x: socialX, y: socialStartY + i * socialSpacing },
-      data: { platform: s.platform, username: s.username, confidence: s.confidence, color: s.color, onSelect: () => onSelect(s.platform) },
-    });
-    edges.push({
-      id: `e-hub-${id}`,
-      source: 'social-hub',
-      target: id,
-      sourceHandle: 'out',
-      type: 'smoothstep',
-      animated: false,
-      style: { stroke: `${s.color}88`, strokeWidth: 1 },
-    });
-  });
-
-  return { nodes, edges };
-}
+import { FinderForm, type FinderQuery } from '@/components/finder/FinderForm';
+import { FinderReportView } from '@/components/finder/FinderReportView';
+import { StatusBar } from '@/components/StatusBar';
+import type { FinderReport } from '@/types/finder';
 
 export default function IdentityMapper() {
-  const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
-  const [person, setPerson] = useState<PersonData | null>(null);
+  const [report, setReport] = useState<FinderReport | null>(null);
 
-  const { nodes: graphNodes, edges: graphEdges } = useMemo(
-    () => person ? buildGraph(person, setSelectedNode) : { nodes: [], edges: [] },
-    [person]
-  );
-
-  const [nodes, setNodes, onNodesChange] = useNodesState(graphNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(graphEdges);
-
-  // Sync when person changes
-  useMemo(() => {
-    setNodes(graphNodes);
-    setEdges(graphEdges);
-  }, [graphNodes, graphEdges, setNodes, setEdges]);
-
-  const handleSearch = useCallback(async (query: string) => {
+  const handleSearch = useCallback(async (q: FinderQuery) => {
     setIsScanning(true);
-    setSelectedNode(null);
+    setReport(null);
 
     try {
       const { data, error } = await supabase.functions.invoke('investigate', {
-        body: { query },
+        body: q,
       });
-
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-
-      setPerson(data as PersonData);
-      setTimeout(() => setSelectedNode('center'), 300);
+      setReport(data as FinderReport);
     } catch (err: any) {
-      console.error('Investigation failed:', err);
-      toast.error(err.message || 'Failed to investigate. Please try again.');
+      console.error('OSINT search failed:', err);
+      toast.error(err.message || 'Failed to run OSINT search.');
     } finally {
       setIsScanning(false);
     }
   }, []);
 
   return (
-    <div className="w-full h-screen bg-background relative overflow-hidden">
-      <div className="absolute inset-0 cyber-grid opacity-40" />
-      <div className="absolute inset-0 scan-line pointer-events-none" />
+    <div className="w-full min-h-screen bg-background relative overflow-x-hidden">
+      <div className="fixed inset-0 cyber-grid opacity-30 pointer-events-none" />
+      <div className="fixed inset-0 scan-line pointer-events-none" />
 
-      <SearchBar onSearch={handleSearch} isScanning={isScanning} />
-
-      {person ? (
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          nodeTypes={nodeTypes}
-          connectionLineType={ConnectionLineType.SmoothStep}
-          fitView
-          fitViewOptions={{ padding: 0.3 }}
-          minZoom={0.3}
-          maxZoom={2}
-          proOptions={{ hideAttribution: true }}
-        >
-          <Background color="hsl(220, 15%, 12%)" gap={40} size={1} />
-          <Controls
-            className="!bg-card !border-border !rounded-xl !shadow-2xl [&>button]:!bg-secondary [&>button]:!border-border [&>button]:!text-muted-foreground [&>button:hover]:!bg-secondary/80"
-            showInteractive={false}
-          />
-        </ReactFlow>
-      ) : (
-        <div className="flex items-center justify-center h-full">
-          <div className="text-center space-y-3">
-            <p className="text-muted-foreground text-sm font-mono">Enter a username above to begin investigation</p>
-            <p className="text-muted-foreground/50 text-xs">Powered by AI · Uses only public data patterns</p>
+      <header className="relative z-10 px-4 pt-6 pb-2">
+        <div className="max-w-5xl mx-auto flex items-center gap-2">
+          <div className="w-9 h-9 rounded-xl bg-primary/15 border border-primary/30 flex items-center justify-center">
+            <Search className="w-4 h-4 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-lg font-bold text-foreground tracking-tight">Social Media Finder</h1>
+            <p className="text-[10px] text-muted-foreground font-mono">OSINT-style profile discovery across platforms</p>
           </div>
         </div>
-      )}
+      </header>
 
-      {person && (
-        <DetailPanel selectedNode={selectedNode} person={person} onClose={() => setSelectedNode(null)} />
-      )}
+      <main className="relative z-10 px-4 py-6 space-y-8">
+        <FinderForm onSearch={handleSearch} isScanning={isScanning} />
+
+        {!report && !isScanning && (
+          <div className="text-center pt-8">
+            <p className="text-muted-foreground text-sm font-mono">
+              Enter a name above to discover possible matching profiles.
+            </p>
+            <p className="text-muted-foreground/50 text-xs mt-1">
+              Powered by AI · Uses only public data patterns
+            </p>
+          </div>
+        )}
+
+        {isScanning && (
+          <div className="max-w-3xl mx-auto bg-card/60 border border-border rounded-2xl p-8 text-center">
+            <div className="inline-flex items-center gap-2 text-sm font-mono text-primary animate-pulse">
+              <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+              Scanning Instagram, Facebook, LinkedIn, X, Snapchat…
+            </div>
+            <p className="text-[11px] text-muted-foreground mt-2">
+              Cross-checking photos, bios, locations and activity patterns.
+            </p>
+          </div>
+        )}
+
+        {report && <FinderReportView report={report} />}
+      </main>
+
       <StatusBar />
     </div>
   );
