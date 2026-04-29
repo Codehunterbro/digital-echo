@@ -1,20 +1,33 @@
-export interface FinderProfile {
+export interface VerifiedProfile {
   platform: string;
   username: string;
-  displayName: string;
   url: string;
-  avatarHint: string;
-  bio: string;
-  location: string;
-  followers: number | null;
-  following: number | null;
-  posts: number | null;
-  lastActive: string;
   verified: boolean;
-  confidence: number;
-  matchingIndicators: string[];
-  inconsistencies: string[];
-  status: 'Shortlisted' | 'Eliminated' | 'Needs Review';
+  bioExcerpt?: string;
+}
+
+export interface CrossLinkedAccount {
+  platform: string;
+  url: string;
+  discoveredVia: string; // e.g. "Linked from LinkedIn contact section"
+}
+
+export interface IdentityGroup {
+  groupName: string; // "Person A", "Person B"
+  displayName: string;
+  summary: string;
+  matchedDetails: {
+    location?: string | null;
+    profession?: string | null;
+    education?: string | null;
+    interests?: string | null;
+    company?: string | null;
+  };
+  verifiedProfiles: VerifiedProfile[];
+  crossLinkedAccounts: CrossLinkedAccount[];
+  verifiedDataPoints: string[]; // at least 3
+  connectionExplanation: string;
+  confidence: 'High' | 'Medium' | 'Low';
 }
 
 export interface FinderReport {
@@ -23,12 +36,10 @@ export interface FinderReport {
     location: string | null;
     interests: string | null;
     profession: string | null;
+    knownUsernames: string | null;
   };
   summary: string;
-  overallConfidence: number;
-  verdict: 'Confirmed Match' | 'Likely Match' | 'Possible Match' | 'No Confirmed Match';
-  profiles: FinderProfile[];
-  crossChecks: string[];
-  recommendations: string[];
+  groups: IdentityGroup[]; // empty if no confirmed match
+  noConfirmedMatch: boolean;
   disclaimer: string;
 }

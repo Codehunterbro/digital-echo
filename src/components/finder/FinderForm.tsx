@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Search, AlertTriangle, MapPin, Briefcase, Heart } from 'lucide-react';
+import { Search, AlertTriangle, MapPin, Briefcase, Heart, AtSign } from 'lucide-react';
 
 export interface FinderQuery {
   fullName: string;
   location: string;
   interests: string;
   profession: string;
+  knownUsernames: string;
 }
 
 interface Props {
@@ -19,6 +20,7 @@ export function FinderForm({ onSearch, isScanning }: Props) {
   const [location, setLocation] = useState('');
   const [interests, setInterests] = useState('');
   const [profession, setProfession] = useState('');
+  const [knownUsernames, setKnownUsernames] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,6 +30,7 @@ export function FinderForm({ onSearch, isScanning }: Props) {
       location: location.trim(),
       interests: interests.trim(),
       profession: profession.trim(),
+      knownUsernames: knownUsernames.trim(),
     });
   };
 
@@ -80,12 +83,20 @@ export function FinderForm({ onSearch, isScanning }: Props) {
             />
             <Field
               icon={<Briefcase className="w-3 h-3" />}
-              label="Profession"
+              label="Profession / Education"
               value={profession}
               onChange={setProfession}
-              placeholder="Software engineer"
+              placeholder="Software engineer / MIT"
             />
           </div>
+
+          <Field
+            icon={<AtSign className="w-3 h-3" />}
+            label="Known usernames / handles (optional)"
+            value={knownUsernames}
+            onChange={setKnownUsernames}
+            placeholder="@janedoe, jdoe92"
+          />
 
           <button
             type="submit"
